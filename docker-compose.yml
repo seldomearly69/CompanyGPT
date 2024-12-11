@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  pgdb: 
+    container_name: pgdb
+    build: ./pgdb
+    ports: 
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - internal_network
+  chromadb:
+    image: chromadb/chroma:0.5.18.dev9  # Use the appropriate ChromaDB image version
+    env_file:
+      - ./.env
+    volumes:
+      - ./my_db:/chroma/my_db
+      - ./my_config:/chroma/my_config
+    ports:
+      - "8000:8000"  # Expose ChromaDB's port for external access if needed
+    networks:
+      - internal_network
+
+  flask-app:
+    build:
+      context: ./backend  # Dockerfile for Flask app should be in the same directory
+    ports:
+      - "5001:5001"  # Expose Flask app on port 5000
+    env_file:
+      - ./.env
+    depends_on:
+      - chromadb  # Ensures ChromaDB service starts before the Flask app
+    networks:
+      - internal_network
+    environment:
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./backend/app.py:/app/app.py
+      - ./backend/utils.py:/app/utils.py
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  internal_network:
+    driver: bridge
